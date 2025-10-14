@@ -75,6 +75,10 @@ test-results/
 junit.xml
 *.lcov
 
+# Bruno sensitive
+/bruno/environments/local.env.json
+/bruno/environments/*.secrets.json
+
 # Documentation and notes
 COURSE_NOTES.md
 spec.txt
