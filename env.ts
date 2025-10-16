@@ -1,3 +1,4 @@
+import { error } from 'console'
 import { env as loadEnv } from 'custom-env'
 import { z } from 'zod'
 
@@ -8,13 +9,13 @@ process.env.APP_STAGE = process.env.APP_STAGE || 'dev'
 
 // helpers
 const isProduction = process.env.APP_STAGE === 'production'
-const isDev = process.env.APP_STAGE === 'dev'
-const isTest = process.env.APP_STAGE === 'test'
+const isDevelopment = process.env.APP_STAGE === 'dev'
+const isTesting = process.env.APP_STAGE === 'test'
 
-if (isDev) {
+if (isDevelopment) {
   loadEnv() // loads the local .env file
 }
-else if (isTest) {
+else if (isTesting) {
   loadEnv('test') // loads the local .env.test file
 }
 // not loading a 'production' .env file 
@@ -54,5 +55,46 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, 'Must be 32 chars long'),
   JWT_EXPIRES_IN: z.string().default('7d'),
 
-
+  // number of rounds for bcrypt, 10 and 20 are arbitrary, no real decision
+  // behind them.
+  BCRYPT_ROUNDS: z.coerce.number().min(10).max(20).default(12), 
 })
+
+// exporting the type from zod's infer method that infers a type from 
+// a zod schema or object. 
+export type Env = z.infer<typeof envSchema>
+
+let env: Env
+
+try {
+  // this will parse the kv pairs from process.env into our envSchema.
+  // if any of the values from our environment that get parsed into our
+  // schema, it will fail and our environment variables will have been
+  // set incorrectly
+  env = envSchema.parse(process.env)
+} catch (e) {
+  // if the error is because of a failed parse meaning validation failed
+  if (e instanceof z.ZodError) {
+    console.log('Invalid env var')
+    // stringifies the json object into a readable format
+    console.log(JSON.stringify(z.flattenError(e).fieldErrors, null, 2));
+
+    // log each error (issue) 
+    e.issues.forEach(iss => {
+      const path = iss.path.join('.')
+      console.log(`${path}: ${iss.message}`)
+    })
+
+    // kill the server
+    process.exit(1)
+  }
+  // not a zod error
+  throw e
+}
+
+export const isProd = () => env.APP_STAGE === 'production'
+export const isDev = () => env.APP_STAGE === 'dev'
+export const isTest= () => env.APP_STAGE === 'test'
+
+export { env }
+export default env
